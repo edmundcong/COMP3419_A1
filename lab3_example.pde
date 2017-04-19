@@ -114,16 +114,20 @@ PImage block(PImage frame) {
   // step 1 of the meta-algorithm: dividing the frame into K blocks
   int frameWidth = frame.width;
   int frameHeight = frame.height;
-  int totalGridBlocks = (frameWidth*frameHeight)/(K*K);
-  int chunks = frameWidth/K;
-  PImage frameBlocks[] = new PImage[totalGridBlocks];
-  
+  int totalGridBlocks = round( (float) (frameWidth*frameHeight)/(K*K));
+  PImage frameBlocks[] = new PImage[totalGridBlocks + 1];
+  int counter = 0;
+    System.out.println("totalGridBlocks: "+totalGridBlocks);
     for (int x = 0; x < frameWidth; x+=K) {
      for (int y = 0; y < frameHeight; y+=K) {
-        System.out.println("x, y: " + x + " " + y);
+        //System.out.println("x, y: " + x + " " + y);
         PImage temp = frame.get(x,y,(int) frameWidth/totalGridBlocks, (int) frameHeight/totalGridBlocks);
-        image(temp,0,0);
+        frameBlocks[counter] = temp;
+        counter++;
     }
+  }
+  for (int i = 0; i < counter; i++) {
+     image(frameBlocks[i], totalGridBlocks*3*i, totalGridBlocks*3*i); 
   }
   // step 2 of the meta-algorithm
   //System.exit(0);
