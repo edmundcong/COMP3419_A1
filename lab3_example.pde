@@ -13,8 +13,15 @@ Movie m;
 
 List<PImage[]> frames = new ArrayList<PImage[]>(); // array list of frames
 int frameCounter = 0;
-int K = 257;
+int K = 197;
 int totalGridBlocks;
+boolean playImages = false;
+int currFrame = 0;
+int globalWidth = (720 + K - 1) / K; // rounds up
+int globalHeight = (576 + K - 1) / K; // rounds up
+// displacement vector
+int displacement_vector[][][] = new int[globalWidth][globalHeight][2]; // 0 -> x, 1 -> y
+int coords[][] = new int[(globalWidth*globalWidth)+globalHeight][2]; // 0 -> x, 1 -> y
 
 int framenumber = 1; 
 int phase = 1; // The phase for precessing pipeline : 1, saving frames of background; 2. overwrite the background frames with 
@@ -26,10 +33,10 @@ PImage bg;
 PImage monkeyframe;
 
 void setup() { 
-  size(1280, 720); //Just large enough to see what is happening
+  size(720, 576); //Just large enough to see what is happening
   frameRate(120); // Make your draw function run faster
   //create a Movie object. 
-  m = new Movie(this, sketchPath("star_trails.mov")); 
+  m = new Movie(this, sketchPath("monkey.avi")); 
   m.frameRate(120); // Play your movie faster
 
   framenumber = 0; 
@@ -40,6 +47,23 @@ void setup() {
 } 
 
 void draw() { 
+  if (playImages) {
+    PImage currFrameArray[] = frames.get(currFrame);
+    int chunkHeight = globalHeight/totalGridBlocks;
+    int chunkWidth = globalWidth/totalGridBlocks;
+    m.read(); 
+    image(m, 0, 0);
+    for (int i = 0; i < totalGridBlocks; i++) {
+      System.out.println("chunkWidth: " + chunkWidth + "*" + i + " = " + chunkWidth*i + " chunkHeight: " + chunkHeight + "*" + i + " = " + chunkHeight*i);
+      image(currFrameArray[i], chunkWidth*i, chunkHeight*i); 
+    }
+    currFrame++;
+    //System.out.println("currFrame: " + currFrame + " frameCounter: " + frameCounter);
+    if (currFrame >= frameCounter) {
+     exit(); 
+    }
+  } else {
+  
   // Clear the background with black colour
   float time = m.time();
   float duration = m.duration();
@@ -49,7 +73,7 @@ void draw() {
   if ( time >= duration ) { 
     if (phase == 1) {
       m = new Movie(this, sketchPath("monkey.avi"));
-      m.frameRate(200); // Play your movie faster
+      m.frameRate(120); // Play your movie faster
       m.play();
       phase = 2;
       bgctr = framenumber;
@@ -66,7 +90,7 @@ void draw() {
       block(m);
       frameCounter++;  
       //image(m, 0, 0);
-      m.save(sketchPath("") + "BG/"+nf(framenumber, 4) + ".tif"); // They say tiff is faster to save, but larger in disks
+      //m.save(sketchPath("") + "BG/"+nf(framenumber, 4) + ".tif"); // They say tiff is faster to save, but larger in disks
     } else if (phase == 2) {
       // step 2 of the meta-algorithm
       for (int i = 0; i < frameCounter; i++){
@@ -74,18 +98,18 @@ void draw() {
         if (i+1 < frameCounter) {
          PImage B_i[] = frames.get(i); // frame i
          PImage B_j[] = frames.get(i+1); // frame i+1
+         int min_ssd_index = 0;
          for (int j = 0; j <  totalGridBlocks; j++){
            int width = B_i[j].width;
            int height = B_i[j].height;
-           int min_ssd_index = 0;
            float min_ssd = 0;
+           int new_x, new_y = 0;
            for (int k = 0; k < totalGridBlocks; k++) {
              // (x,y) and (x',y')
              float diff = 0;
              float ssd = 0;
              for (int x = 0; x < width; x++) {
                for (int y = 0; y < height; y++) {
-                 //System.out.println(B_i.pixels[y*width+x]);
                  // gotta get absolute difference
                  color temp_i = B_i[j].pixels[y*width+x];
                  color temp_j = B_j[k].pixels[y*width+x];
@@ -94,39 +118,35 @@ void draw() {
                }  
              }
              if (k == 0) {
-              min_ssd = ssd;
-              min_ssd_index = k;
-             }
-             if (ssd < min_ssd) {
+               min_ssd = ssd;
+               min_ssd_index = k;
+             } else if (ssd < min_ssd) {
                min_ssd = ssd;
                min_ssd_index = k;
              }
-             //System.out.println("The SSD at frame " + i + " at block j:" + j + " and block k: " + k + " = " + ssd + " and min ssd " + min_ssd);
            }
-           
+           //displacement_vector[i][j][0]
            //if (min_ssd > 0) System.out.println(min_ssd_index);
-           //System.out.println("The minimum SSD frame at " + i + " is frame " + min_ssd_index + " with value " + min_ssd);
-           //if (i+1 != frameCounter) {
-           //  //PImage B_i = frames.get(i)[j];
-           //  //PImage B_j = frames.get(i+1)[j];
-           //  int width = B_i[j].width;
-           //  int height = B_i[j].height;
-             //int diff = 0;
-             //int ssd = 0;
-             //// (x,y) and (x',y')
-             //for (int x = 0; x < width; x++) {
-             //  for (int y = 0; y < height; y++) {
-             //    //System.out.println(B_i.pixels[y*width+x]);
-             //    diff = B_i.pixels[y*width+x] - B_j.pixels[y*width+x];
-             //    ssd += diff * diff;
-             //  }  
-             //}
-             //System.out.println("SSD @ " + i + "," + j + " : " + ssd);
            }
-           //image(temp, totalGridBlocks*5*1, totalGridBlocks*1);
+           B_j[min_ssd_index].filter(INVERT);
+           frames.set(i+1, B_j);
          }
         }
-         exit();
+        playImages = true;
+        //for (int i = 0; i < frameCounter; i++) {
+        //  System.out.println("frameCounter: " + i);
+        //  PImage temp[] = frames.get(i);
+        //  drawImage(temp);
+          //for (int j = 0; j < totalGridBlocks; i++) {
+             //PImage temp_img = temp[j];
+              //temp_img.save(sketchPath("") + "BG/"+nf(i, 4) + nf(j, 4) + ".jpg"); // They say tiff is faster to save, but larger in disks
+             //image(temp[0], totalGridBlocks*3*i, totalGridBlocks*6*i); 
+          //}
+        //}
+          //for (int i = 0; i < counter; i++) {
+          //   image(frameBlocks[i], totalGridBlocks*3*i, totalGridBlocks*3*i); 
+          //}
+         //exit();
       }
       //monkeyframe = removeBackground(m);
       //bg = loadImage(sketchPath("") + "BG/"+nf(framenumber % bgctr, 4) + ".tif");
@@ -167,18 +187,25 @@ void draw() {
     System.out.printf("Phase: %d - Frame %d\n", phase, framenumber);
     framenumber++;
   }
-
+}
 // Called every time a new frame is available to read 
 void movieEvent(Movie m) {
 } 
+
+void drawImage(PImage frameBlocks[]) {
+    for (int i = 0; i < totalGridBlocks; i++) {
+     System.out.println("totalGridBlocks: " + i);
+     //image(frameBlocks[i], totalGridBlocks*3*i, totalGridBlocks*3*i); 
+    }
+}
 
 PImage block(PImage frame) {
   //image(frame,0,0);
   // uses 3 step search see https://en.wikipedia.org/wiki/Block-matching_algorithm#Three_Step_Search
   // https://au.mathworks.com/help/vision/ref/blockmatching.html
   // step 1 of the meta-algorithm: dividing the frame into K blocks
-  int frameWidth = frame.width;
-  int frameHeight = frame.height;
+  int frameWidth = globalWidth = frame.width;
+  int frameHeight = globalHeight = frame.height;
   totalGridBlocks = round( (float) (frameWidth*frameHeight)/(K*K)) + 1;
   PImage frameBlocks[] = new PImage[totalGridBlocks];
   int counter = 0;
@@ -187,7 +214,10 @@ PImage block(PImage frame) {
      for (int y = 0; y < frameHeight; y+=K) {
         //System.out.println("x, y: " + x + " " + y);
         PImage temp = frame.get(x,y,(int) frameWidth/totalGridBlocks, (int) frameHeight/totalGridBlocks);
+        image(temp, 0, 0);
         System.out.println(counter + " : " + totalGridBlocks);
+        //coords[y*width+x][0] = x;
+        //coords[y*width+x][1] = y;
         frameBlocks[counter] = temp;
         counter++;
         System.out.println("counter: " + counter + " tgb: " + totalGridBlocks);
@@ -197,7 +227,8 @@ PImage block(PImage frame) {
   //for (int i = 0; i < counter; i++) {
   //   image(frameBlocks[i], totalGridBlocks*3*i, totalGridBlocks*3*i); 
   //}
-  System.out.println("framecounter: " + frameCounter);
+  
+  //System.out.println("counter: " + counter);
   frames.add(frameCounter, frameBlocks);
   // this will produce an error on the last frame so ill need to counteract this
   return frame;
