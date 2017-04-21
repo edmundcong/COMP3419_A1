@@ -206,21 +206,29 @@ PImage block(PImage frame) {
   // step 1 of the meta-algorithm: dividing the frame into K blocks
   int frameWidth = globalWidth = frame.width;
   int frameHeight = globalHeight = frame.height;
-  totalGridBlocks = round( (float) (frameWidth*frameHeight)/(K*K)) + 1;
+  totalGridBlocks = ceil( (float) (frameWidth*frameHeight)/(K*K)) + 1;
   PImage frameBlocks[] = new PImage[totalGridBlocks];
   int counter = 0;
     //System.out.println("totalGridBlocks: "+totalGridBlocks);
     for (int x = 0; x < frameWidth; x+=K) {
      for (int y = 0; y < frameHeight; y+=K) {
         //System.out.println("x, y: " + x + " " + y);
-        PImage temp = frame.get(x,y,(int) frameWidth/totalGridBlocks, (int) frameHeight/totalGridBlocks);
-        image(temp, 0, 0);
+        // fw/(fw/k/) and fh/(fh/k) will yield values for accurately displaying our image
+        PImage temp = frame.get(x,y,(int) frameWidth/(frameWidth/K), (int) frameHeight/(frameHeight/K));
+        //image(temp, 0, 0);
         System.out.println(counter + " : " + totalGridBlocks);
-        //coords[y*width+x][0] = x;
-        //coords[y*width+x][1] = y;
+        System.out.println("fw/t: " + (int) frameWidth/totalGridBlocks + " fh/t: " + (int) frameHeight/totalGridBlocks);
         frameBlocks[counter] = temp;
+        if (counter >= 2) {
+         image(frameBlocks[counter-2], x, 0);
+         image(frameBlocks[counter-1], x, 197);
+         image(frameBlocks[counter], x, 394);
+        } else if (counter >= 1) {
+         image(frameBlocks[counter-1], x, 0);
+         image(frameBlocks[counter], x, 197); 
+        }
         counter++;
-        System.out.println("counter: " + counter + " tgb: " + totalGridBlocks);
+        System.out.println("x: " + x + " y: " + y);
     }
   }
   //System.out.println("counter: " + counter + " other one: " + totalGridBlocks);
