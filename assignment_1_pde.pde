@@ -19,6 +19,7 @@ int block_width = 32;
 int block_height = 26;
 // array of blocks for all frames
 PImage frames_blocks[][][] = new PImage[total_movie_frames][block_width][block_height];
+int displacement_vector[][][][] = new int[total_movie_frames][block_width][block_height][2]; // x -> 0, y -> 1
 int movie_frame_height = 0;
 int movie_frame_width = 0;
 boolean play_movie = false;
@@ -40,11 +41,23 @@ void draw() {
         for (int i = 0; i < total_movie_frames; i++ ) {
           int x_iterator = 0;
           int y_iterator = 0;
+          float magnitude = 0; // will be 1/(x+y) 
           // merge images
           PGraphics output = createGraphics(720, 576, JAVA2D);
           output.beginDraw();
           for (int x = 0; x < movie_frame_width; x+=K) {
             for (int y = 0; y < movie_frame_height; y+=K) {
+            /* Visualise the displacement fields with a 2D image with the same size as frame Fi. The same
+               magnitude value is assigned to all the pixels within the region covered by a single grid block. */
+                //if (displacement_vector[i][x_iterator][y_iterator][0] == 0 && displacement_vector[i][x_iterator][y_iterator][1] == 0) {
+                  // our 2D image is our frame_blocks at i. At i the sum of our x and y arrays = a full image frame
+                  //frames_blocks[i][x_iterator][y_iterator].filter(POSTERIZE, 2+(abs(displacement_vector[i][x_iterator][y_iterator][0])
+                  //+ abs(displacement_vector[i][x_iterator][y_iterator][0])));
+                  //magnitude = 1 + (abs(displacement_vector[i][x_iterator][y_iterator][0]) + abs(displacement_vector[i][x_iterator][y_iterator][0]));
+                  
+                  //output.image(frames_blocks[i][x_iterator][y_iterator], x, y);
+                //} //else
+                frames_blocks[i][x_iterator][y_iterator].filter(GRAY);
                 output.image(frames_blocks[i][x_iterator][y_iterator], x, y);
               y_iterator++;
             }
@@ -52,7 +65,6 @@ void draw() {
             x_iterator++;
           }
           output.endDraw();
-          image(output, 0,0);
           // output images
           output.save(sketchPath("") + "BG/i"+nf(i,4)+".tif"); // They say tiff is faster to save, but larger in     disks
           System.out.println((float) i / (float) total_movie_frames + "% complete for frame output");
@@ -69,22 +81,32 @@ void draw() {
       float min_SSD = 0;
       int min_ssd_x = 0;
       int min_ssd_y = 0;
-      boolean first = true;
+      // current and displacement coordinates
+      int curr_x = 0;
+      int curr_y = 0;
+      int disp_x = 0;
+      int disp_y = 0;
+      
+      boolean first = true; // flag for min_ssd initialisation on first iteration
+      
       for (int i = 0; i < total_movie_frames - 1; i++) {
         for (int x = 0; x < block_width; x++) {
+          curr_x = x*block_width;
           for (int y = 0; y < block_height; y++) {
             current_frame = frames_blocks[i][x][y];
+            curr_y = y*block_height;
             min_ssd_x = 0;
             min_ssd_y = 0;
+            disp_x = 0;
+            disp_y = 0;
             first = true;
             min_SSD = 0;
-            for (int x_x = x - 1; x_x < x + 1; x_x++) { // x +- 4
-              for (int y_y = y - 1; y_y < y + 1; y_y++) { // y +- 4
+            // search 1 grid block radius
+            for (int x_x = x - 1; x_x <= x + 1; x_x++) { // x +- 1
+              if (x_x < 0) x_x = 0;
+              for (int y_y = y - 1; y_y <= y + 1; y_y++) { // y +- 1
                 // edge cases
-                if (x_x <= 0) x_x = 0;
-                if (y_y <= 0) y_y = 0;
-                if (x_x >= block_width) x_x = block_width - 1;
-                if (y_y >= block_height) y_y = block_height - 1;
+                if (y_y < 0) y_y = 0;
                 reference_frame = frames_blocks[i+1][x_x][y_y];
                 SSD = 0;
                 diff = 0;
@@ -97,18 +119,34 @@ void draw() {
                   }  
                 }
                 SSD = sqrt(SSD);
-                if (first == true) min_SSD = SSD;
-                first = false;
-                if (min_SSD > 4000) {
-                if (SSD < min_SSD) {
-                 min_SSD = SSD;
-                 min_ssd_x = x_x;
-                 min_ssd_y = y_y;
-                 }
+                if (first == true) {
+                  min_SSD = SSD;
+                  min_ssd_x = x_x;
+                  min_ssd_y = y_y;
+                  disp_x = x_x*block_width;
+                  disp_y = y_y*block_height;
                 }
+                first = false;
+                //if (min_SSD > 4000) { // theshhold value
+                  if (SSD < min_SSD) {
+                     min_SSD = SSD;
+                     min_ssd_x = x_x;
+                     min_ssd_y = y_y;
+                     disp_x = x_x*block_width;
+                     disp_y = y_y*block_height;
+                   }
+                //}
+                if (y_y == block_height - 1) break; // edge case since block height and width is out of bounds for array
               }
+              if (x_x == block_width - 1) break;
             }
-            frames_blocks[i+1][min_ssd_x][min_ssd_y].filter(GRAY);
+            displacement_vector[i+1][min_ssd_x][min_ssd_y][0] = disp_x - curr_x;
+            displacement_vector[i+1][min_ssd_x][min_ssd_y][1] = disp_y - curr_y;
+            
+            //System.out.println("X,Y: ("+min_ssd_x+", "+min_ssd_y+")");
+            //System.out.println("X: = ("+disp_x+", "+curr_x+") -> " + (disp_x-curr_x));
+            //System.out.println("Y: = ("+disp_y+", "+curr_y+") -> " + (disp_y-curr_y));
+            //frames_blocks[i+1][min_ssd_x][min_ssd_y].filter(GRAY);
           }
         }
         System.out.println((float) i/ (float) total_movie_frames + "% complete");
